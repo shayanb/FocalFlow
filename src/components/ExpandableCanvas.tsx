@@ -176,16 +176,27 @@ export default function ExpandableCanvas({
 
       // Draw focal point if set
       if (focalImage.focalPoint) {
+        // Account for zoom and offset when rendering focal point
+        const zoom = focalImage.imageZoom || 1
+        const offset = focalImage.imageOffset || { x: 0, y: 0 }
+        
+        const focalX = (focalImage.focalPoint.x - img.width / 2) * zoom + offset.x
+        const focalY = (focalImage.focalPoint.y - img.height / 2) * zoom + offset.y
+        
         ctx.fillStyle = '#ef4444'
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 2 / (focalImage.transform.scale * viewport.zoom)
+        
         ctx.beginPath()
         ctx.arc(
-          focalImage.focalPoint.x - img.width / 2,
-          focalImage.focalPoint.y - img.height / 2,
-          5 / (focalImage.transform.scale * viewport.zoom),
+          focalX,
+          focalY,
+          6 / (focalImage.transform.scale * viewport.zoom),
           0,
           Math.PI * 2
         )
         ctx.fill()
+        ctx.stroke()
       }
 
       ctx.restore()
@@ -235,8 +246,20 @@ export default function ExpandableCanvas({
         // Calculate the click position relative to the image
         const loadedImg = loadedImages.current.get(clickedImage.id)
         if (loadedImg) {
-          const relativeX = (worldPos.x - clickedImage.transform.position.x) / clickedImage.transform.scale + loadedImg.width / 2
-          const relativeY = (worldPos.y - clickedImage.transform.position.y) / clickedImage.transform.scale + loadedImg.height / 2
+          // Account for image zoom and offset
+          const zoom = clickedImage.imageZoom || 1
+          const offset = clickedImage.imageOffset || { x: 0, y: 0 }
+          
+          // Transform click position to image space
+          const clickInImageSpace = {
+            x: (worldPos.x - clickedImage.transform.position.x) / clickedImage.transform.scale,
+            y: (worldPos.y - clickedImage.transform.position.y) / clickedImage.transform.scale
+          }
+          
+          // Account for zoom and offset to get actual image coordinates
+          const relativeX = (clickInImageSpace.x - offset.x) / zoom + loadedImg.width / 2
+          const relativeY = (clickInImageSpace.y - offset.y) / zoom + loadedImg.height / 2
+          
           onSetFocalPoint(clickedImage.id, { x: relativeX, y: relativeY })
         }
       } else {
@@ -383,6 +406,7 @@ export default function ExpandableCanvas({
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
         onDoubleClick={handleDoubleClick}
+        style={{ cursor: isMarkingFocalPoints ? 'crosshair' : 'move' }}
       />
       <div className="absolute top-4 right-4 bg-white rounded-lg shadow p-2 text-sm">
         <div>Zoom: {Math.round(viewport.zoom * 100)}%</div>

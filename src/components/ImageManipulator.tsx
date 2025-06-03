@@ -4,13 +4,17 @@ import { FocalImage } from '../types/canvas'
 interface ImageManipulatorProps {
   image: FocalImage
   onOffsetChange: (offset: { x: number, y: number }) => void
+  onSetFocalPoint?: (point: { x: number, y: number }) => void
   isActive: boolean
+  isMarkingFocalPoint?: boolean
 }
 
 export default function ImageManipulator({
   image,
   onOffsetChange,
-  isActive
+  onSetFocalPoint,
+  isActive,
+  isMarkingFocalPoint = false
 }: ImageManipulatorProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
@@ -72,14 +76,40 @@ export default function ImageManipulator({
 
     // Draw focal point if exists
     if (image.focalPoint) {
-      ctx.fillStyle = '#ef4444'
-      ctx.beginPath()
       const fpX = 100 + (image.focalPoint.x - img.width / 2) * scale * zoom + scaledOffset.x
       const fpY = 100 + (image.focalPoint.y - img.height / 2) * scale * zoom + scaledOffset.y
-      ctx.arc(fpX, fpY, 3, 0, Math.PI * 2)
+      
+      ctx.fillStyle = '#ef4444'
+      ctx.strokeStyle = '#fff'
+      ctx.lineWidth = 2
+      
+      ctx.beginPath()
+      ctx.arc(fpX, fpY, 5, 0, Math.PI * 2)
       ctx.fill()
+      ctx.stroke()
     }
-  }, [image, isActive])
+    
+    // Show crosshair if marking focal point
+    if (isMarkingFocalPoint) {
+      ctx.strokeStyle = '#ef4444'
+      ctx.lineWidth = 1
+      ctx.setLineDash([5, 5])
+      
+      // Vertical line
+      ctx.beginPath()
+      ctx.moveTo(100, 0)
+      ctx.lineTo(100, 200)
+      ctx.stroke()
+      
+      // Horizontal line
+      ctx.beginPath()
+      ctx.moveTo(0, 100)
+      ctx.lineTo(200, 100)
+      ctx.stroke()
+      
+      ctx.setLineDash([])
+    }
+  }, [image, isActive, isMarkingFocalPoint])
 
   useEffect(() => {
     render()
@@ -87,13 +117,31 @@ export default function ImageManipulator({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect()
-    if (!rect) return
+    if (!rect || !imageRef.current) return
 
-    setIsDragging(true)
-    setDragStart({
+    const mousePos = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
-    })
+    }
+
+    if (isMarkingFocalPoint && onSetFocalPoint) {
+      // Calculate the click position relative to the actual image
+      const scale = 200 / Math.max(imageRef.current.width, imageRef.current.height)
+      const zoom = image.imageZoom || 1
+      const scaledOffset = {
+        x: (image.imageOffset?.x || 0) * scale,
+        y: (image.imageOffset?.y || 0) * scale
+      }
+      
+      // Convert click to image coordinates
+      const imageX = (mousePos.x - 100 - scaledOffset.x) / (scale * zoom) + imageRef.current.width / 2
+      const imageY = (mousePos.y - 100 - scaledOffset.y) / (scale * zoom) + imageRef.current.height / 2
+      
+      onSetFocalPoint({ x: imageX, y: imageY })
+    } else {
+      setIsDragging(true)
+      setDragStart(mousePos)
+    }
   }
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -132,14 +180,16 @@ export default function ImageManipulator({
         ref={canvasRef}
         width={200}
         height={200}
-        className={`cursor-${isDragging ? 'grabbing' : 'grab'} bg-gray-100`}
+        className={`${
+          isMarkingFocalPoint ? 'cursor-crosshair' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        } bg-gray-100`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       />
       <div className="text-xs text-gray-500 mt-1 text-center">
-        Drag to reposition image in frame
+        {isMarkingFocalPoint ? 'Click to mark focal point' : 'Drag to reposition image in frame'}
       </div>
     </div>
   )

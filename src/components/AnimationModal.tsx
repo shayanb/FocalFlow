@@ -15,8 +15,11 @@ export default function AnimationModal({
   onClose
 }: AnimationModalProps) {
   const [isPlaying, setIsPlaying] = useState(true)
-  const [fps, setFps] = useState(24)
+  const [fps, setFps] = useState(12)
   const [currentFrame, setCurrentFrame] = useState(0)
+  const [transition, setTransition] = useState<'none' | 'fade' | 'dissolve' | 'blend'>('fade')
+  const transitionDuration = 0.3
+  const [motionTrails, setMotionTrails] = useState(false)
 
   if (!isOpen) return null
 
@@ -41,6 +44,9 @@ export default function AnimationModal({
             isPlaying={isPlaying}
             fps={fps}
             onFrameChange={setCurrentFrame}
+            transition={transition}
+            transitionDuration={transitionDuration}
+            motionTrails={motionTrails}
           />
         </div>
 
@@ -70,20 +76,54 @@ export default function AnimationModal({
               </button>
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600">FPS:</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={fps}
-                  onChange={(e) => setFps(parseInt(e.target.value) || 24)}
-                  className="w-16 px-2 py-1 border rounded"
-                />
+            <div className="flex flex-col gap-3 flex-1 mx-8">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="text-sm text-gray-600 block mb-1">FPS: {fps}</label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="30"
+                    value={fps}
+                    onChange={(e) => setFps(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>1</span>
+                    <span>15</span>
+                    <span>30</span>
+                  </div>
+                </div>
+                
+                <div className="flex-1">
+                  <label className="text-sm text-gray-600 block mb-1">Transition</label>
+                  <select
+                    value={transition}
+                    onChange={(e) => setTransition(e.target.value as 'none' | 'fade' | 'dissolve' | 'blend')}
+                    className="w-full px-2 py-1 border rounded"
+                  >
+                    <option value="none">None</option>
+                    <option value="fade">Fade</option>
+                    <option value="dissolve">Dissolve</option>
+                    <option value="blend">Blend</option>
+                  </select>
+                </div>
               </div>
-              <div className="text-sm text-gray-600">
-                Frame {currentFrame + 1} of {images.length}
+              
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={motionTrails}
+                    onChange={(e) => setMotionTrails(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-sm text-gray-600">Motion Trails</span>
+                </label>
+                
+                <div className="text-sm text-gray-600">
+                  Frame {currentFrame + 1} of {images.length}
+                </div>
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ interface DraggableImageListProps {
   onImageSelect: (imageId: string) => void
   onImageDelete: (imageId: string) => void
   onReorder: (images: FocalImage[]) => void
+  onBringToFront?: (imageId: string) => void
 }
 
 export default function DraggableImageList({
@@ -15,7 +16,8 @@ export default function DraggableImageList({
   selectedImageId,
   onImageSelect,
   onImageDelete,
-  onReorder
+  onReorder,
+  onBringToFront
 }: DraggableImageListProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
@@ -80,6 +82,7 @@ export default function DraggableImageList({
           onDrop={(e) => handleDrop(e, img.id)}
           onDragEnd={handleDragEnd}
           onClick={() => onImageSelect(img.id)}
+          onDoubleClick={() => onBringToFront?.(img.id)}
           className={`p-2 rounded cursor-pointer flex items-center gap-2 transition-all ${
             img.id === selectedImageId 
               ? 'bg-blue-50 border-blue-300 border' 

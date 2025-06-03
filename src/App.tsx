@@ -27,25 +27,33 @@ function App() {
       return a.lastModified - b.lastModified
     })
 
-    const newImages: FocalImage[] = sortedFiles.map((file, index) => ({
-      id: `img-${Date.now()}-${index}`,
-      file,
-      url: URL.createObjectURL(file),
-      naturalSize: { width: 0, height: 0 },
-      transform: {
-        position: { 
-          x: (index % 5) * 200 - 400, 
-          y: Math.floor(index / 5) * 200 - 200 
+    const newImages: FocalImage[] = sortedFiles.map((file, index) => {
+      // Calculate grid position with more spacing to prevent overlap
+      const cols = 4
+      const spacing = 300 // Increased spacing between images
+      const col = index % cols
+      const row = Math.floor(index / cols)
+      
+      return {
+        id: `img-${Date.now()}-${index}`,
+        file,
+        url: URL.createObjectURL(file),
+        naturalSize: { width: 0, height: 0 },
+        transform: {
+          position: { 
+            x: col * spacing - (cols - 1) * spacing / 2, 
+            y: row * spacing - spacing / 2
+          },
+          scale: 0.3, // Smaller initial scale to prevent overlap
+          rotation: 0
         },
-        scale: 0.5,
-        rotation: 0
-      },
-      opacity: 1,
-      timestamp: Date.now() + index,
-      imageZoom: 1,
-      imageOffset: { x: 0, y: 0 },
-      zIndex: images.length + index
-    }))
+        opacity: 1,
+        timestamp: Date.now() + index,
+        imageZoom: 1,
+        imageOffset: { x: 0, y: 0 },
+        zIndex: images.length + index
+      }
+    })
 
     setImages(prev => [...prev, ...newImages])
 
@@ -90,10 +98,10 @@ function App() {
         ...img,
         transform: {
           position: { 
-            x: (index % 5) * 200 - 400, 
-            y: Math.floor(index / 5) * 200 - 200 
+            x: (index % 4) * 300 - 450, 
+            y: Math.floor(index / 4) * 300 - 150 
           },
-          scale: 0.5,
+          scale: 0.3,
           rotation: 0
         },
         opacity: 1,
@@ -246,39 +254,24 @@ function App() {
                   onImageSelect={setSelectedImageId}
                   onImageDelete={handleDeleteImage}
                   onReorder={setImages}
+                  onBringToFront={handleBringToFront}
                 />
               </div>
             )}
 
-            {images.length > 0 && (
-              <div className="mt-6 p-4 bg-blue-50 rounded">
-                <h3 className="font-medium mb-3">Focal Point Alignment</h3>
+            {images.filter(img => img.focalPoint).length >= 2 && (
+              <div className="mt-6 p-4 bg-green-50 rounded">
+                <h3 className="font-medium mb-3">Auto Align</h3>
                 <p className="text-sm text-gray-600 mb-3">
-                  Mark the same object in each image to align them
+                  {images.filter(img => img.focalPoint).length} of {images.length} focal points marked
                 </p>
                 <button
-                  onClick={() => setIsMarkingFocalPoints(!isMarkingFocalPoints)}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded transition-colors ${
-                    isMarkingFocalPoints 
-                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-                  }`}
+                  onClick={handleAlignImages}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                 >
-                  <Target size={16} />
-                  {isMarkingFocalPoints ? 'Click images to mark focal points' : 'Start marking focal points'}
+                  <Wand2 size={16} />
+                  Align Images
                 </button>
-                <div className="mt-3 text-xs text-gray-600">
-                  {images.filter(img => img.focalPoint).length} of {images.length} focal points marked
-                </div>
-                {images.filter(img => img.focalPoint).length >= 2 && (
-                  <button
-                    onClick={handleAlignImages}
-                    className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                  >
-                    <Wand2 size={16} />
-                    Align Images
-                  </button>
-                )}
               </div>
             )}
 
@@ -345,6 +338,7 @@ function App() {
       >
         {selectedImage && (
           <div className="space-y-3">
+            
             <div className="pb-2 border-b">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Frame</h4>
               <div>
@@ -365,11 +359,31 @@ function App() {
             <div className="pb-2 border-b">
               <h4 className="text-sm font-medium text-gray-700 mb-2">Image</h4>
               <div className="space-y-2">
-                <ImageManipulator
-                  image={selectedImage}
-                  onOffsetChange={(offset) => handleImageOffset(selectedImageId!, offset)}
-                  isActive={true}
-                />
+                <div className="relative">
+                  <ImageManipulator
+                    image={selectedImage}
+                    onOffsetChange={(offset) => handleImageOffset(selectedImageId!, offset)}
+                    onSetFocalPoint={(point) => {
+                      handleSetFocalPoint(selectedImageId!, point)
+                      setIsMarkingFocalPoints(false)
+                    }}
+                    isActive={true}
+                    isMarkingFocalPoint={isMarkingFocalPoints}
+                  />
+                  <button
+                    onClick={() => setIsMarkingFocalPoints(!isMarkingFocalPoints)}
+                    className={`absolute top-2 right-2 p-1.5 rounded-full transition-all ${
+                      isMarkingFocalPoints 
+                        ? 'bg-red-500 text-white hover:bg-red-600' 
+                        : selectedImage.focalPoint
+                          ? 'bg-white/80 text-green-600 hover:bg-white'
+                          : 'bg-white/80 text-gray-600 hover:bg-white hover:text-red-500'
+                    } shadow-sm`}
+                    title={isMarkingFocalPoints ? 'Cancel marking' : selectedImage.focalPoint ? 'Update focal point' : 'Mark focal point'}
+                  >
+                    <Target size={16} />
+                  </button>
+                </div>
                 <div>
                   <label className="text-sm text-gray-600">Image Zoom</label>
                   <input

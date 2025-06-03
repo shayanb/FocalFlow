@@ -7,6 +7,8 @@ export interface ExportOptions {
   fps: number
   quality: number
   onProgress?: (progress: number) => void
+  transition?: 'none' | 'fade' | 'dissolve' | 'blend'
+  motionTrails?: boolean
 }
 
 export async function exportToGIF(
