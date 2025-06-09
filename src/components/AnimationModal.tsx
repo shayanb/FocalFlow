@@ -48,7 +48,7 @@ export default function AnimationModal({
 
       // Determine file extension and name
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-      let extension = exportFormat
+      let extension: string = exportFormat
       if (exportFormat === 'frames') extension = 'zip'
       
       const filename = `focalflow-${timestamp}.${extension}`

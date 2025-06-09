@@ -73,7 +73,7 @@ export async function exportToWebM(
         resolve(blob)
       }
       
-      mediaRecorder.onerror = (event) => {
+      mediaRecorder.onerror = () => {
         reject(new Error('Video recording failed'))
       }
       
@@ -244,8 +244,7 @@ export async function exportToGIF(
         height: height,
         repeat: 0,
         background: '#1f2937',
-        dither: 'FloydSteinberg-serpentine',
-        globalPalette: false
+        dither: 'FloydSteinberg-serpentine'
       })
 
       // Sort images by timestamp (same as AnimationPlayer)
@@ -408,10 +407,8 @@ export async function exportToGIF(
         resolve(blob)
       })
 
-      gif.on('error', (error) => {
-        clearTimeout(timeout)
-        reject(error)
-      })
+      // Note: gif.js doesn't have an 'error' event in its types
+      // We rely on the timeout to catch issues
 
       // Start encoding
       gif.render()
