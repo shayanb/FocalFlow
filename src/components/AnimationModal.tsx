@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import AnimationPlayer from './AnimationPlayer'
-import ExportModal from './ExportModal'
 import { FocalImage } from '../types/canvas'
-import { X, Play, Pause, SkipBack, SkipForward, Download } from 'lucide-react'
+import { exportAnimation, downloadBlob } from '../utils/exportUtils'
+import { X, Play, Pause, SkipBack, SkipForward, Download, Loader2 } from 'lucide-react'
 
 interface AnimationModalProps {
   images: FocalImage[]
@@ -23,7 +23,49 @@ export default function AnimationModal({
   const [motionTrails, setMotionTrails] = useState(false)
   const [trailLength, setTrailLength] = useState(3)
   const [trailOpacity, setTrailOpacity] = useState(0.3)
-  const [showExportModal, setShowExportModal] = useState(false)
+  const [showExportPanel, setShowExportPanel] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
+  const [exportFormat, setExportFormat] = useState<'webm' | 'gif' | 'frames'>('gif')
+
+  const handleExport = async () => {
+    setIsExporting(true)
+    setExportProgress(0)
+
+    try {
+      const blob = await exportAnimation(images, {
+        format: exportFormat,
+        width: 800,
+        height: 600,
+        fps,
+        quality: 10,
+        onProgress: setExportProgress,
+        transition,
+        motionTrails,
+        trailLength,
+        trailOpacity
+      })
+
+      // Determine file extension and name
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      let extension = exportFormat
+      if (exportFormat === 'frames') extension = 'zip'
+      
+      const filename = `focalflow-${timestamp}.${extension}`
+      downloadBlob(blob, filename)
+      
+      // Close export panel on success
+      setShowExportPanel(false)
+      
+    } catch (error) {
+      console.error('Export failed:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Export failed: ${errorMessage}`)
+    } finally {
+      setIsExporting(false)
+      setExportProgress(0)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -81,11 +123,15 @@ export default function AnimationModal({
                 <SkipForward size={20} />
               </button>
               <button
-                onClick={() => setShowExportModal(true)}
-                className="p-2 bg-green-600 text-white rounded hover:bg-green-700"
-                title="Export animation"
+                onClick={() => setShowExportPanel(!showExportPanel)}
+                className={`p-2 text-white rounded ${
+                  showExportPanel 
+                    ? 'bg-red-600 hover:bg-red-700' 
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
+                title={showExportPanel ? "Close export" : "Export animation"}
               >
-                <Download size={20} />
+                {showExportPanel ? <X size={20} /> : <Download size={20} />}
               </button>
             </div>
 
@@ -170,24 +216,86 @@ export default function AnimationModal({
                 </div>
               </div>
             </div>
+
+            {/* Export Panel */}
+            {showExportPanel && (
+              <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium text-gray-800">Export Animation</h3>
+                  {isExporting && (
+                    <span className="text-sm text-gray-600">{Math.round(exportProgress * 100)}%</span>
+                  )}
+                </div>
+
+                {/* Format Selection */}
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <button
+                    onClick={() => setExportFormat('gif')}
+                    className={`p-2 rounded text-sm ${
+                      exportFormat === 'gif'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    GIF
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('webm')}
+                    className={`p-2 rounded text-sm ${
+                      exportFormat === 'webm'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    WebM
+                  </button>
+                  <button
+                    onClick={() => setExportFormat('frames')}
+                    className={`p-2 rounded text-sm ${
+                      exportFormat === 'frames'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Frames
+                  </button>
+                </div>
+
+                {/* Progress Bar */}
+                {isExporting && (
+                  <div className="mb-4">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${exportProgress * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Export Button */}
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={16} />
+                      Export {exportFormat.toUpperCase()}
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Export Modal */}
-      <ExportModal
-        images={images}
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        animationSettings={{
-          fps,
-          transition,
-          transitionDuration,
-          motionTrails,
-          trailLength,
-          trailOpacity
-        }}
-      />
     </div>
   )
 }

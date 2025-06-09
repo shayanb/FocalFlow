@@ -19,8 +19,6 @@ export async function exportToWebM(
 ): Promise<Blob> {
   const { width, height, fps, quality, onProgress } = options
   
-  console.log(`WebM export: ${width}x${height}, ${images.length} frames, ${fps} fps, quality: ${quality}`)
-  
   return new Promise(async (resolve, reject) => {
     try {
       // Create canvas and video stream
@@ -61,7 +59,6 @@ export async function exportToWebM(
         }
       }
       
-      console.log(`Using bitrate: ${bitrate} bps, codec: ${mediaRecorder.mimeType}`)
       
       const chunks: Blob[] = []
       
@@ -73,12 +70,10 @@ export async function exportToWebM(
       
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'video/webm' })
-        console.log('WebM export completed, size:', blob.size)
         resolve(blob)
       }
       
       mediaRecorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event)
         reject(new Error('Video recording failed'))
       }
       
@@ -94,7 +89,6 @@ export async function exportToWebM(
       })
       
       const loadedImages = await Promise.all(imagePromises)
-      console.log(`Loaded ${loadedImages.length} images for WebM export`)
       
       // Start recording
       mediaRecorder.start()
@@ -148,7 +142,6 @@ export async function exportToWebM(
       }, 30000)
       
     } catch (error) {
-      console.error('WebM export error:', error)
       reject(error)
     }
   })
@@ -161,7 +154,6 @@ export async function exportFramesAsZip(
 ): Promise<Blob> {
   const { width, height, onProgress } = options
   
-  console.log(`Frames ZIP export: ${width}x${height}, ${images.length} frames`)
   
   return new Promise(async (resolve, reject) => {
     try {
@@ -215,24 +207,29 @@ export async function exportFramesAsZip(
       // Create a simple "ZIP-like" blob (just concatenated data for now)
       // In a real implementation, you'd use JSZip here
       const combinedBlob = new Blob(frameBlobs, { type: 'application/zip' })
-      console.log('Frames export completed, size:', combinedBlob.size)
       resolve(combinedBlob)
       
     } catch (error) {
-      console.error('Frames export error:', error)
       reject(error)
     }
   })
 }
 
-// Simple GIF export using modern approach
+// GIF export using exact same rendering logic as AnimationPlayer
 export async function exportToGIF(
   images: FocalImage[],
   options: ExportOptions
 ): Promise<Blob> {
-  const { width, height, fps, quality, onProgress } = options
-  
-  console.log(`GIF export: ${width}x${height}, ${images.length} frames, ${fps} fps`)
+  const { 
+    width, 
+    height, 
+    fps, 
+    quality, 
+    onProgress, 
+    motionTrails = false, 
+    trailLength = 3, 
+    trailOpacity = 0.3 
+  } = options
   
   return new Promise(async (resolve, reject) => {
     try {
@@ -241,18 +238,17 @@ export async function exportToGIF(
       
       // Create GIF with optimized settings
       const gif = new GIF({
-        workers: 1, // Use single worker to avoid CSP issues
+        workers: 1,
         quality: quality,
         width: width,
         height: height,
         repeat: 0,
         background: '#1f2937',
-        transparent: null,
         dither: 'FloydSteinberg-serpentine',
         globalPalette: false
       })
 
-      // Sort images by timestamp
+      // Sort images by timestamp (same as AnimationPlayer)
       const sortedImages = [...images].sort((a, b) => a.timestamp - b.timestamp)
       
       // Create canvas for rendering frames
@@ -272,46 +268,136 @@ export async function exportToGIF(
       })
 
       const loadedImages = await Promise.all(imagePromises)
-      console.log(`Loaded ${loadedImages.length} images for GIF export`)
+      const loadedImagesMap = new Map(loadedImages.map(({ focalImage, htmlImage }) => [focalImage.id, htmlImage]))
 
-      // Render and add each frame
-      for (let frameIndex = 0; frameIndex < loadedImages.length; frameIndex++) {
-        const { focalImage, htmlImage } = loadedImages[frameIndex]
+      // Calculate canvas bounds to fit all images (same as AnimationPlayer)
+      const calculateBounds = () => {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+
+        sortedImages.forEach(img => {
+          const loadedImg = loadedImagesMap.get(img.id)
+          if (!loadedImg) return
+
+          const halfWidth = (loadedImg.width * img.transform.scale) / 2
+          const halfHeight = (loadedImg.height * img.transform.scale) / 2
+
+          minX = Math.min(minX, img.transform.position.x - halfWidth)
+          maxX = Math.max(maxX, img.transform.position.x + halfWidth)
+          minY = Math.min(minY, img.transform.position.y - halfHeight)
+          maxY = Math.max(maxY, img.transform.position.y + halfHeight)
+        })
+
+        return {
+          center: { x: (minX + maxX) / 2, y: (minY + maxY) / 2 },
+          width: maxX - minX,
+          height: maxY - minY
+        }
+      }
+
+      // Render image function (same as AnimationPlayer)
+      const renderImage = (img: FocalImage, alpha: number) => {
+        const loadedImg = loadedImagesMap.get(img.id)
+        if (!loadedImg || alpha === 0) return
+
+        ctx.save()
         
-        console.log(`Rendering GIF frame ${frameIndex + 1}/${loadedImages.length}`)
-        
-        // Clear canvas
-        ctx.fillStyle = '#1f2937'
+        // Apply transforms
+        ctx.translate(img.transform.position.x, img.transform.position.y)
+        ctx.rotate(img.transform.rotation)
+        ctx.scale(img.transform.scale, img.transform.scale)
+        ctx.globalAlpha = alpha * img.opacity
+
+        // Set up clipping for frame
+        ctx.beginPath()
+        ctx.rect(-loadedImg.width / 2, -loadedImg.height / 2, loadedImg.width, loadedImg.height)
+        ctx.clip()
+
+        // Apply image zoom and offset
+        const zoom = img.imageZoom || 1
+        const offset = img.imageOffset || { x: 0, y: 0 }
+
+        // Draw image
+        ctx.drawImage(
+          loadedImg,
+          -loadedImg.width * zoom / 2 + offset.x,
+          -loadedImg.height * zoom / 2 + offset.y,
+          loadedImg.width * zoom,
+          loadedImg.height * zoom
+        )
+
+        ctx.restore()
+      }
+
+      const frameHistory: number[] = []
+      const bounds = calculateBounds()
+      const padding = 50
+      const scaleX = (width - padding * 2) / bounds.width
+      const scaleY = (height - padding * 2) / bounds.height
+      const scale = Math.min(scaleX, scaleY, 1) // Don't scale up, only down
+
+      // Calculate canvas center and apply global transform
+      const centerX = width / 2
+      const centerY = height / 2
+
+      // Render each frame (same as AnimationPlayer)
+      for (let frameIndex = 0; frameIndex < sortedImages.length; frameIndex++) {
+        // Clear canvas with background
+        ctx.fillStyle = '#1f2937' // bg-gray-800
         ctx.fillRect(0, 0, width, height)
 
-        // Render image centered
-        const scale = Math.min(width / htmlImage.width, height / htmlImage.height) * 0.8
-        const x = (width - htmlImage.width * scale) / 2
-        const y = (height - htmlImage.height * scale) / 2
+        ctx.save()
+        ctx.translate(centerX, centerY)
+        ctx.scale(scale, scale)
+        ctx.translate(-bounds.center.x, -bounds.center.y)
+
+        const currentImage = sortedImages[frameIndex % sortedImages.length]
+
+        // Render motion trails if enabled
+        if (motionTrails && frameHistory.length > 0) {
+          const trailFrames = frameHistory.slice(-trailLength)
+          trailFrames.forEach((historicFrame, index) => {
+            if (historicFrame !== frameIndex) {
+              const trailImage = sortedImages[historicFrame % sortedImages.length]
+              const trailAlpha = (trailOpacity * (index + 1)) / trailLength * 0.5
+              renderImage(trailImage, trailAlpha)
+            }
+          })
+        }
+
+        // Render all images in their positions (sorted by zIndex)
+        const sortedByZ = [...sortedImages].sort((a, b) => a.zIndex - b.zIndex)
         
-        ctx.globalAlpha = focalImage.opacity
-        ctx.drawImage(htmlImage, x, y, htmlImage.width * scale, htmlImage.height * scale)
+        sortedByZ.forEach(img => {
+          // For GIF export, show current frame at full opacity
+          if (img.id === currentImage.id) {
+            renderImage(img, 1)
+          }
+        })
+
+        ctx.restore()
+
+        // Update frame history for motion trails
+        frameHistory.push(frameIndex)
+        if (frameHistory.length > trailLength) {
+          frameHistory.shift()
+        }
         
         // Add frame to GIF with proper delay
         const delay = Math.max(100, Math.round(1000 / fps))
         gif.addFrame(ctx, { delay, copy: true })
         
         if (onProgress) {
-          onProgress((frameIndex + 1) / loadedImages.length * 0.8)
+          onProgress((frameIndex + 1) / sortedImages.length * 0.8)
         }
       }
 
-      console.log('All GIF frames added, starting encoding...')
-
       // Add reasonable timeout
       const timeout = setTimeout(() => {
-        console.error('GIF encoding timeout')
         reject(new Error('GIF encoding took too long'))
-      }, 60000) // 60 seconds
+      }, 60000)
 
       // Set up event handlers
       gif.on('progress', (p) => {
-        console.log('GIF encoding progress:', p)
         if (onProgress) {
           onProgress(0.8 + p * 0.2)
         }
@@ -319,13 +405,11 @@ export async function exportToGIF(
 
       gif.on('finished', (blob) => {
         clearTimeout(timeout)
-        console.log('GIF encoding finished! Size:', blob.size)
         resolve(blob)
       })
 
       gif.on('error', (error) => {
         clearTimeout(timeout)
-        console.error('GIF encoding error:', error)
         reject(error)
       })
 
@@ -333,7 +417,6 @@ export async function exportToGIF(
       gif.render()
 
     } catch (error) {
-      console.error('GIF export error:', error)
       reject(error)
     }
   })
