@@ -7,7 +7,7 @@ import FloatingPanel from './components/FloatingPanel'
 import DraggableImageList from './components/DraggableImageList'
 import { FocalImage } from './types/canvas'
 import { autoAlignImages } from './core/alignmentEngine'
-import { Grid, Move, Zap, Download, Play, RefreshCw, Target, Wand2 } from 'lucide-react'
+import { Grid, Move, Zap, Download, Play, RefreshCw, Target, Wand2, Github, Twitter } from 'lucide-react'
 
 function App() {
   const [images, setImages] = useState<FocalImage[]>([])
@@ -219,6 +219,21 @@ function App() {
                   Precision
                 </button>
               </div>
+              {images.length > 1 && (
+                <button
+                  onClick={() => {
+                    setSelectedImageId(null)
+                    setShowControlPanel(false)
+                    setShowAnimationModal(true)
+                  }}
+                  className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-lg shadow hover:from-blue-700 hover:to-green-700 transition-all"
+                  title="Preview & Export Animation"
+                >
+                  <Play size={14} />
+                  <span className="text-sm font-medium">Preview & Export</span>
+                  <Download size={14} />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -299,6 +314,35 @@ function App() {
               </div>
             )}
 
+            {/* Footer */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://github.com/shayanb/PulseFrame"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+                    title="View on GitHub"
+                  >
+                    <Github size={18} />
+                  </a>
+                  <a
+                    href="https://x.com/sbetamc"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+                    title="Follow on X"
+                  >
+                    <Twitter size={18} />
+                  </a>
+                </div>
+                <div className="text-xs text-gray-500">
+                  v0.1.0
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -334,35 +378,6 @@ function App() {
             </div>
           )}
 
-          {/* Animation Controls */}
-          {images.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-4 flex items-center gap-4">
-              <button
-                onClick={() => {
-                  setSelectedImageId(null)
-                  setShowControlPanel(false)
-                  setShowAnimationModal(true)
-                }}
-                className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                <Play size={20} />
-              </button>
-              <div className="text-sm text-gray-600">
-                {images.length} frames
-              </div>
-              <button 
-                onClick={() => {
-                  setSelectedImageId(null)
-                  setShowControlPanel(false)
-                  setShowAnimationModal(true)
-                }}
-                className="p-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-                title="Preview & Export"
-              >
-                <Download size={20} />
-              </button>
-            </div>
-          )}
         </div>
       </main>
 
