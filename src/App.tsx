@@ -4,7 +4,6 @@ import ExpandableCanvas from './components/ExpandableCanvas'
 import ImageManipulator from './components/ImageManipulator'
 import AnimationModal from './components/AnimationModal'
 import FloatingPanel from './components/FloatingPanel'
-import ExportModal from './components/ExportModal'
 import DraggableImageList from './components/DraggableImageList'
 import { FocalImage } from './types/canvas'
 import { autoAlignImages } from './core/alignmentEngine'
@@ -13,11 +12,11 @@ import { Grid, Move, Zap, Download, Play, RefreshCw, Target, Wand2 } from 'lucid
 function App() {
   const [images, setImages] = useState<FocalImage[]>([])
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null)
+  const [showControlPanel, setShowControlPanel] = useState(false)
   const [showGrid, setShowGrid] = useState(true)
   const [mode, setMode] = useState<'quick' | 'precision'>('quick')
   const [isMarkingFocalPoints, setIsMarkingFocalPoints] = useState(false)
   const [showAnimationModal, setShowAnimationModal] = useState(false)
-  const [showExportModal, setShowExportModal] = useState(false)
 
   const handleImagesLoad = useCallback((files: File[]) => {
     // Sort files by name first, then by lastModified
@@ -259,19 +258,44 @@ function App() {
               </div>
             )}
 
-            {images.filter(img => img.focalPoint).length >= 2 && (
-              <div className="mt-6 p-4 bg-green-50 rounded">
-                <h3 className="font-medium mb-3">Auto Align</h3>
+            {images.length > 0 && (
+              <div className="mt-6 p-4 bg-blue-50 rounded">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-medium">Focal Points</h3>
+                  <button
+                    onClick={() => setIsMarkingFocalPoints(!isMarkingFocalPoints)}
+                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                      isMarkingFocalPoints
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : images.filter(img => img.focalPoint).length > 0
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-gray-600 text-white hover:bg-gray-700'
+                    }`}
+                  >
+                    <Target size={14} className="inline mr-1" />
+                    {isMarkingFocalPoints ? 'Stop Marking' : 'Mark Points'}
+                  </button>
+                </div>
+                
                 <p className="text-sm text-gray-600 mb-3">
-                  {images.filter(img => img.focalPoint).length} of {images.length} focal points marked
+                  {isMarkingFocalPoints ? (
+                    <span className="text-red-600 font-medium">Click on images to set focal points</span>
+                  ) : (
+                    <>
+                      {images.filter(img => img.focalPoint).length} of {images.length} focal points marked
+                    </>
+                  )}
                 </p>
-                <button
-                  onClick={handleAlignImages}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                >
-                  <Wand2 size={16} />
-                  Align Images
-                </button>
+
+                {images.filter(img => img.focalPoint).length >= 2 && (
+                  <button
+                    onClick={handleAlignImages}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  >
+                    <Wand2 size={16} />
+                    Align Images
+                  </button>
+                )}
               </div>
             )}
 
@@ -287,17 +311,38 @@ function App() {
             onImageTransform={handleImageTransform}
             onSetFocalPoint={handleSetFocalPoint}
             onBringToFront={handleBringToFront}
+            onOpenControlPanel={(imageId) => {
+              setSelectedImageId(imageId)
+              setShowControlPanel(true)
+            }}
             gridSize={50}
             showGrid={showGrid}
             mode={mode}
             isMarkingFocalPoints={isMarkingFocalPoints}
           />
 
+          {/* Control Panel Toggle Button */}
+          {selectedImage && !showControlPanel && (
+            <div className="absolute top-4 right-4">
+              <button
+                onClick={() => setShowControlPanel(true)}
+                className="p-2 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+                title="Open control panel"
+              >
+                <Move size={16} />
+              </button>
+            </div>
+          )}
+
           {/* Animation Controls */}
           {images.length > 1 && (
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-4 flex items-center gap-4">
               <button
-                onClick={() => setShowAnimationModal(true)}
+                onClick={() => {
+                  setSelectedImageId(null)
+                  setShowControlPanel(false)
+                  setShowAnimationModal(true)
+                }}
                 className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 <Play size={20} />
@@ -306,8 +351,13 @@ function App() {
                 {images.length} frames
               </div>
               <button 
-                onClick={() => setShowExportModal(true)}
+                onClick={() => {
+                  setSelectedImageId(null)
+                  setShowControlPanel(false)
+                  setShowAnimationModal(true)
+                }}
                 className="p-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                title="Preview & Export"
               >
                 <Download size={20} />
               </button>
@@ -323,17 +373,14 @@ function App() {
         onClose={() => setShowAnimationModal(false)}
       />
 
-      {/* Export Modal */}
-      <ExportModal
-        images={images}
-        isOpen={showExportModal}
-        onClose={() => setShowExportModal(false)}
-      />
 
       {/* Floating Transform Controls */}
       <FloatingPanel
-        isOpen={!!selectedImage}
-        onClose={() => setSelectedImageId(null)}
+        isOpen={showControlPanel && !!selectedImage}
+        onClose={() => {
+          setShowControlPanel(false)
+          setSelectedImageId(null)
+        }}
         title={selectedImage ? selectedImage.file.name : 'Transform Controls'}
       >
         {selectedImage && (

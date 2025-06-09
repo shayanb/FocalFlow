@@ -32,7 +32,7 @@ export default function ImageManipulator({
 
   const render = useCallback(() => {
     const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
+    const ctx = canvas?.getContext('2d', { willReadFrequently: true })
     const img = imageRef.current
     if (!canvas || !ctx || !img) return
 

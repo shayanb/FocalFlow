@@ -8,6 +8,7 @@ interface ExpandableCanvasProps {
   onImageTransform: (imageId: string, transform: Partial<FocalImage['transform']>) => void
   onSetFocalPoint?: (imageId: string, point: { x: number, y: number }) => void
   onBringToFront?: (imageId: string) => void
+  onOpenControlPanel?: (imageId: string) => void
   gridSize: number
   showGrid: boolean
   mode: 'quick' | 'precision'
@@ -21,6 +22,7 @@ export default function ExpandableCanvas({
   onImageTransform,
   onSetFocalPoint,
   onBringToFront,
+  onOpenControlPanel,
   gridSize = 50,
   showGrid = true,
   mode,
@@ -38,6 +40,8 @@ export default function ExpandableCanvas({
   const [dragOffset, setDragOffset] = useState<Point>({ x: 0, y: 0 })
   const [panStart, setPanStart] = useState<Point>({ x: 0, y: 0 })
   const animationFrameRef = useRef<number>()
+  const [lastClickTime, setLastClickTime] = useState(0)
+  const [lastClickedImageId, setLastClickedImageId] = useState<string | null>(null)
 
   // Load images
   const loadedImages = useRef<Map<string, HTMLImageElement>>(new Map())
@@ -94,7 +98,7 @@ export default function ExpandableCanvas({
   // Render canvas
   const render = useCallback(() => {
     const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
+    const ctx = canvas?.getContext('2d', { willReadFrequently: true })
     if (!canvas || !ctx) return
 
     // Clear canvas
@@ -240,6 +244,13 @@ export default function ExpandableCanvas({
     }
 
     if (clickedImage) {
+      const currentTime = Date.now()
+      const isDoubleClick = currentTime - lastClickTime < 300 && lastClickedImageId === clickedImage.id
+      
+      setLastClickTime(currentTime)
+      setLastClickedImageId(clickedImage.id)
+      
+      // Always select the image on click
       onImageSelect(clickedImage.id)
       
       if (isMarkingFocalPoints && onSetFocalPoint) {
@@ -262,7 +273,11 @@ export default function ExpandableCanvas({
           
           onSetFocalPoint(clickedImage.id, { x: relativeX, y: relativeY })
         }
+      } else if (isDoubleClick && onOpenControlPanel) {
+        // Double-click opens control panel
+        onOpenControlPanel(clickedImage.id)
       } else {
+        // Single click starts dragging
         setIsDragging(true)
         // Calculate offset from image center to click point
         setDragOffset({
@@ -270,7 +285,8 @@ export default function ExpandableCanvas({
           y: worldPos.y - clickedImage.transform.position.y
         })
       }
-    } else if (e.shiftKey || e.button === 1) {
+    } else {
+      // If not clicking on an image, start panning (also supports Shift+click or middle mouse)
       setIsPanning(true)
       setPanStart(mousePos)
       onImageSelect(null)

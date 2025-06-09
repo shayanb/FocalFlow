@@ -1,53 +1,99 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Download, Loader2 } from 'lucide-react'
 import { FocalImage } from '../types/canvas'
-import { exportToGIF, downloadBlob } from '../utils/exportUtils'
+import { exportAnimation, downloadBlob } from '../utils/exportUtils'
+
+interface AnimationSettings {
+  fps: number
+  transition: 'none' | 'fade' | 'dissolve' | 'blend'
+  transitionDuration: number
+  motionTrails: boolean
+  trailLength: number
+  trailOpacity: number
+}
 
 interface ExportModalProps {
   images: FocalImage[]
   isOpen: boolean
   onClose: () => void
+  animationSettings?: AnimationSettings
 }
 
 export default function ExportModal({
   images,
   isOpen,
-  onClose
+  onClose,
+  animationSettings
 }: ExportModalProps) {
   const [isExporting, setIsExporting] = useState(false)
   const [progress, setProgress] = useState(0)
   const [exportSettings, setExportSettings] = useState({
-    format: 'gif' as 'gif' | 'mp4',
+    format: 'webm' as 'webm' | 'gif' | 'frames',
     width: 800,
     height: 600,
     fps: 24,
-    quality: 10 // GIF quality (1-30, lower is better)
+    quality: 10 // Quality (1-30, lower is better)
   })
+
+  // Update export settings when animation settings change
+  useEffect(() => {
+    if (animationSettings) {
+      setExportSettings(prev => ({
+        ...prev,
+        fps: animationSettings.fps
+      }))
+    }
+  }, [animationSettings])
 
   if (!isOpen) return null
 
   const handleExport = async () => {
-    if (exportSettings.format === 'gif') {
-      setIsExporting(true)
-      setProgress(0)
+    setIsExporting(true)
+    setProgress(0)
 
-      try {
-        const blob = await exportToGIF(images, {
-          ...exportSettings,
-          onProgress: setProgress
-        })
+    try {
+      const blob = await exportAnimation(images, {
+        ...exportSettings,
+        onProgress: setProgress,
+        transition: animationSettings?.transition || 'none',
+        motionTrails: animationSettings?.motionTrails || false,
+        trailLength: animationSettings?.trailLength || 3,
+        trailOpacity: animationSettings?.trailOpacity || 0.3
+      })
 
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
-        downloadBlob(blob, `focalflow-${timestamp}.gif`)
-      } catch (error) {
-        console.error('Export failed:', error)
-        alert('Failed to export GIF. Please try again.')
-      } finally {
-        setIsExporting(false)
-        setProgress(0)
+      // Determine file extension based on format
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      let extension = exportSettings.format
+      let formatName = ''
+      
+      switch (exportSettings.format) {
+        case 'webm':
+          extension = 'webm'
+          formatName = 'WebM video'
+          break
+        case 'gif':
+          extension = 'gif'
+          formatName = 'GIF animation'
+          break
+        case 'frames':
+          extension = 'zip'
+          formatName = 'PNG frames ZIP'
+          break
       }
-    } else {
-      alert('MP4 export coming soon!')
+
+      const filename = `focalflow-${timestamp}.${extension}`
+      downloadBlob(blob, filename)
+      
+      // Show success message with format info
+      alert(`Export successful! Downloaded as ${formatName}: ${filename}`)
+      
+    } catch (error) {
+      console.error('Export failed:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      alert(`Export failed: ${errorMessage}. Please try again with different settings.`)
+    } finally {
+      setIsExporting(false)
+      setProgress(0)
     }
   }
 
@@ -60,7 +106,6 @@ export default function ExportModal({
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded"
-            disabled={isExporting}
           >
             <X size={20} />
           </button>
@@ -68,29 +113,82 @@ export default function ExportModal({
 
         {/* Content */}
         <div className="p-6 space-y-4">
+          {/* Animation Settings Display */}
+          {animationSettings && (
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <h4 className="text-sm font-medium text-blue-900 mb-2">Preview Settings</h4>
+              <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
+                <div>FPS: {animationSettings.fps}</div>
+                <div>Transition: {animationSettings.transition}</div>
+                <div>Motion Trails: {animationSettings.motionTrails ? 'On' : 'Off'}</div>
+                {animationSettings.motionTrails && (
+                  <div>Trail Length: {animationSettings.trailLength}</div>
+                )}
+              </div>
+            </div>
+          )}
           {/* Format Selection */}
           <div>
-            <label className="block text-sm font-medium mb-2">Format</label>
-            <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm font-medium mb-2">Export Format</label>
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                onClick={() => setExportSettings(prev => ({ ...prev, format: 'webm' }))}
+                className={`p-3 rounded border text-left ${
+                  exportSettings.format === 'webm'
+                    ? 'bg-blue-50 border-blue-300'
+                    : 'hover:bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className={`font-medium ${exportSettings.format === 'webm' ? 'text-blue-800' : 'text-gray-800'}`}>
+                      WebM Video
+                    </h4>
+                    <p className={`text-sm ${exportSettings.format === 'webm' ? 'text-blue-600' : 'text-gray-600'}`}>
+                      High quality video, smaller file size, smooth playback
+                    </p>
+                  </div>
+                </div>
+              </button>
+              
               <button
                 onClick={() => setExportSettings(prev => ({ ...prev, format: 'gif' }))}
-                className={`p-2 rounded border ${
+                className={`p-3 rounded border text-left ${
                   exportSettings.format === 'gif'
-                    ? 'bg-blue-50 border-blue-300 text-blue-700'
-                    : 'hover:bg-gray-50'
+                    ? 'bg-green-50 border-green-300'
+                    : 'hover:bg-gray-50 border-gray-200'
                 }`}
               >
-                GIF
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className={`font-medium ${exportSettings.format === 'gif' ? 'text-green-800' : 'text-gray-800'}`}>
+                      GIF Animation
+                    </h4>
+                    <p className={`text-sm ${exportSettings.format === 'gif' ? 'text-green-600' : 'text-gray-600'}`}>
+                      Universal compatibility, auto-loops, larger file size
+                    </p>
+                  </div>
+                </div>
               </button>
+              
               <button
-                onClick={() => setExportSettings(prev => ({ ...prev, format: 'mp4' }))}
-                className={`p-2 rounded border ${
-                  exportSettings.format === 'mp4'
-                    ? 'bg-blue-50 border-blue-300 text-blue-700'
-                    : 'hover:bg-gray-50'
+                onClick={() => setExportSettings(prev => ({ ...prev, format: 'frames' }))}
+                className={`p-3 rounded border text-left ${
+                  exportSettings.format === 'frames'
+                    ? 'bg-purple-50 border-purple-300'
+                    : 'hover:bg-gray-50 border-gray-200'
                 }`}
               >
-                MP4 (Coming Soon)
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className={`font-medium ${exportSettings.format === 'frames' ? 'text-purple-800' : 'text-gray-800'}`}>
+                      PNG Frames
+                    </h4>
+                    <p className={`text-sm ${exportSettings.format === 'frames' ? 'text-purple-600' : 'text-gray-600'}`}>
+                      Individual images for custom video editing
+                    </p>
+                  </div>
+                </div>
               </button>
             </div>
           </div>
@@ -134,24 +232,22 @@ export default function ExportModal({
             />
           </div>
 
-          {/* Quality Setting (GIF only) */}
-          {exportSettings.format === 'gif' && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Quality</label>
-              <input
-                type="range"
-                value={exportSettings.quality}
-                onChange={(e) => setExportSettings(prev => ({ ...prev, quality: parseInt(e.target.value) }))}
-                className="w-full"
-                min="1"
-                max="30"
-              />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Best</span>
-                <span>Smallest</span>
-              </div>
+          {/* Video Quality Setting */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Quality</label>
+            <input
+              type="range"
+              value={exportSettings.quality}
+              onChange={(e) => setExportSettings(prev => ({ ...prev, quality: parseInt(e.target.value) }))}
+              className="w-full"
+              min="1"
+              max="30"
+            />
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>Best (Larger)</span>
+              <span>Fastest (Smaller)</span>
             </div>
-          )}
+          </div>
 
           {/* Progress Bar */}
           {isExporting && (
@@ -175,13 +271,12 @@ export default function ExportModal({
           <button
             onClick={onClose}
             className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
-            disabled={isExporting}
           >
             Cancel
           </button>
           <button
             onClick={handleExport}
-            disabled={isExporting || exportSettings.format === 'mp4'}
+            disabled={isExporting}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isExporting ? (

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import AnimationPlayer from './AnimationPlayer'
+import ExportModal from './ExportModal'
 import { FocalImage } from '../types/canvas'
-import { X, Play, Pause, SkipBack, SkipForward } from 'lucide-react'
+import { X, Play, Pause, SkipBack, SkipForward, Download } from 'lucide-react'
 
 interface AnimationModalProps {
   images: FocalImage[]
@@ -15,11 +16,14 @@ export default function AnimationModal({
   onClose
 }: AnimationModalProps) {
   const [isPlaying, setIsPlaying] = useState(true)
-  const [fps, setFps] = useState(12)
+  const [fps, setFps] = useState(2)
   const [currentFrame, setCurrentFrame] = useState(0)
   const [transition, setTransition] = useState<'none' | 'fade' | 'dissolve' | 'blend'>('fade')
   const transitionDuration = 0.3
   const [motionTrails, setMotionTrails] = useState(false)
+  const [trailLength, setTrailLength] = useState(3)
+  const [trailOpacity, setTrailOpacity] = useState(0.3)
+  const [showExportModal, setShowExportModal] = useState(false)
 
   if (!isOpen) return null
 
@@ -47,6 +51,8 @@ export default function AnimationModal({
             transition={transition}
             transitionDuration={transitionDuration}
             motionTrails={motionTrails}
+            trailLength={trailLength}
+            trailOpacity={trailOpacity}
           />
         </div>
 
@@ -74,23 +80,31 @@ export default function AnimationModal({
               >
                 <SkipForward size={20} />
               </button>
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="p-2 bg-green-600 text-white rounded hover:bg-green-700"
+                title="Export animation"
+              >
+                <Download size={20} />
+              </button>
             </div>
 
             <div className="flex flex-col gap-3 flex-1 mx-8">
               <div className="flex items-center gap-4">
                 <div className="flex-1">
-                  <label className="text-sm text-gray-600 block mb-1">FPS: {fps}</label>
+                  <label className="text-sm text-gray-600 block mb-1">FPS: {fps < 1 ? fps.toFixed(1) : fps}</label>
                   <input
                     type="range"
-                    min="1"
+                    min="0.2"
                     max="30"
+                    step="0.1"
                     value={fps}
-                    onChange={(e) => setFps(parseInt(e.target.value))}
+                    onChange={(e) => setFps(parseFloat(e.target.value))}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>1</span>
-                    <span>15</span>
+                    <span>0.2</span>
+                    <span>5</span>
                     <span>30</span>
                   </div>
                 </div>
@@ -111,15 +125,45 @@ export default function AnimationModal({
               </div>
               
               <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={motionTrails}
-                    onChange={(e) => setMotionTrails(e.target.checked)}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-gray-600">Motion Trails</span>
-                </label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={motionTrails}
+                      onChange={(e) => setMotionTrails(e.target.checked)}
+                      className="rounded"
+                    />
+                    <span className="text-sm text-gray-600">Motion Trails</span>
+                  </label>
+                  
+                  {motionTrails && (
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <label className="text-xs text-gray-600">Length: {trailLength}</label>
+                        <input
+                          type="range"
+                          min="2"
+                          max="8"
+                          value={trailLength}
+                          onChange={(e) => setTrailLength(parseInt(e.target.value))}
+                          className="w-16"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Opacity: {Math.round(trailOpacity * 100)}%</label>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="0.8"
+                          step="0.1"
+                          value={trailOpacity}
+                          onChange={(e) => setTrailOpacity(parseFloat(e.target.value))}
+                          className="w-16"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
                 
                 <div className="text-sm text-gray-600">
                   Frame {currentFrame + 1} of {images.length}
@@ -129,6 +173,21 @@ export default function AnimationModal({
           </div>
         </div>
       </div>
+
+      {/* Export Modal */}
+      <ExportModal
+        images={images}
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        animationSettings={{
+          fps,
+          transition,
+          transitionDuration,
+          motionTrails,
+          trailLength,
+          trailOpacity
+        }}
+      />
     </div>
   )
 }

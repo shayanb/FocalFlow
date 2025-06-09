@@ -108,7 +108,7 @@ export default function AnimationPlayer({
 
   const renderFrame = useCallback((frameIndex: number, transitionAmount: number = 0) => {
     const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
+    const ctx = canvas?.getContext('2d', { willReadFrequently: true })
     if (!canvas || !ctx || sortedImages.length === 0) return
 
     // Clear canvas with background

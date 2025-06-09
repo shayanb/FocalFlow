@@ -10,7 +10,10 @@
       "Bash(cp:*)",
       "Bash(mv:*)",
       "Bash(npm run lint)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(npm run deploy:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }
